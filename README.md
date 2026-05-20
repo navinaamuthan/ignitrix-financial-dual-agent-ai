@@ -377,9 +377,7 @@ Update the relevant `.env` files if ports are already in use.
 
 # Built At
 
-Google Cloud Agentic AI Hackathon
+Google Cloud Agentic AI Hackathon' 2025 - Bangalore
 Team Ignitirix - Navina Amuthan & Harihara Roopan
-Grand Finalist — Top 250 of 50,000+ participants worldwide
-
 ---
 
