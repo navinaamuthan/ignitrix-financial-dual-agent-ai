@@ -1,10 +1,21 @@
-# Ignitrix Agentic AI
+# IGNITRIX — Dual-Agent Adversarial AI Financial Intelligence System
 
-A comprehensive AI-powered financial analysis system featuring specialized agents, backend services, and a modern chat interface. The system leverages FI Money MCP (Model Context Protocol) for real-time financial data access and analysis.
+> Built end-to-end in 48 hours at the Google Cloud Agentic AI Hackathon  
+> Grand Finalist — Top 250 of 50,000+ participants worldwide
 
-## System Architecture
+---
 
-```
+# Overview
+
+IGNITRIX is a dual-agent adversarial financial intelligence system that uses two specialised AI agents to analyse financial data, challenge each other's conclusions, and produce validated financial insights.
+
+The core architectural insight behind IGNITRIX is that a single AI agent tends to over-confirm its own reasoning. By designing two adversarial agents that challenge each other before producing a final recommendation, the system reduces hallucination risk and improves the reliability of financial analysis.
+
+---
+
+# System Architecture
+
+```text
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   Frontend      │    │    Backend      │    │     Agent       │
 │   (Port 5173)   │◄──►│   (Port 3000)   │◄──►│   (Port 8000)   │
@@ -12,224 +23,363 @@ A comprehensive AI-powered financial analysis system featuring specialized agent
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
-## Services Overview
+---
 
-### 🤖 Agent Service (Port 8000)
-- **Technology**: Google ADK Web
-- **Purpose**: AI agents for financial analysis and strategy planning
-- **Agents**: Maya (Health Diagnostic), Nash (Strategy Planning), Collaboration Engine
-- **Integration**: FI Money MCP for financial data access
+# Services Overview
 
-### 🔧 Backend Service (Port 3000)
-- **Technology**: Node.js + Express
-- **Purpose**: API gateway, session management, chat orchestration
-- **Features**: Firebase integration, session persistence, real-time chat
+## Agent Service (Port 8000)
 
-### 🎨 Frontend Service (Port 5173)
-- **Technology**: React + Vite
-- **Purpose**: Modern chat interface for user interaction
-- **Features**: Real-time messaging, session management, responsive UI
+- **Technology:** Google ADK Web
+- **Purpose:** AI agents for financial analysis and strategy planning
+- **Agents:** Maya, Nash, Collaboration Engine
+- **Integration:** FI Money MCP for structured financial data access
 
-## Prerequisites
+---
 
-- **Node.js** (v16 or higher)
-- **Python** (v3.8 or higher) - for agent service
-- **Google Cloud Project** with Vertex AI enabled
-- **Firebase Project** - for backend data storage
-- **FI Money MCP** - for financial data access
+## Backend Service (Port 3000)
 
-## Quick Start
+- **Technology:** Node.js + Express
+- **Purpose:** API gateway, session management, chat orchestration
+- **Features:**
+  - Firebase integration
+  - Session persistence
+  - Real-time chat handling
 
-### 1. Agent Service Setup
+---
 
-Navigate to the agent directory and set up the environment:
+## Frontend Service (Port 5173)
+
+- **Technology:** React + Vite
+- **Purpose:** Modern chat interface for user interaction
+- **Features:**
+  - Real-time messaging
+  - Session management
+  - Responsive UI
+
+---
+
+# AI Agents
+
+## Maya — Financial Health Diagnostic Agent
+
+Maya analyses financial data to surface insights and diagnose the overall health of a user's financial position.
+
+She is the first agent in the reasoning pipeline and produces a structured financial health assessment from raw financial inputs.
+
+---
+
+## Nash — Strategy Planning Agent
+
+Nash takes Maya’s assessment and stress-tests it.
+
+He models alternative scenarios, identifies weaknesses in Maya’s reasoning, and proposes strategic recommendations. Nash is intentionally adversarial to Maya’s outputs.
+
+---
+
+## Collaboration Engine
+
+The Collaboration Engine orchestrates the interaction between Maya and Nash.
+
+It manages:
+- Structured handoff
+- Reasoning validation
+- Challenge cycles
+- Final output reconciliation
+
+The final system response represents both agents’ reasoning processes.
+
+---
+
+# Key Architecture Decisions
+
+## 1. Why dual adversarial agents rather than a single agent?
+
+Single agents naturally tend to over-confirm their own reasoning.
+
+In financial analysis, a confident but incorrect answer is worse than an uncertain one. By designing Maya and Nash as adversarial agents where Nash explicitly challenges Maya’s conclusions, IGNITRIX introduces validation directly into the reasoning chain itself rather than bolting it on afterwards.
+
+This was the most important architectural decision in the system.
+
+Every other design choice flows from it.
+
+### Rejected Alternative
+**Single orchestrator agent with chain-of-thought prompting**
+
+**Reason for rejection:**  
+Chain-of-thought prompting improves reasoning quality but does not introduce genuine adversarial challenge. The model is still validating its own logic rather than being challenged by an independent reasoning process.
+
+---
+
+## 2. How agents safely read and act on financial data
+
+The core challenge was ensuring agents had access to accurate, non-stale, non-duplicated financial data without overloading context windows.
+
+### Decision
+Use **FI Money MCP** as a structured retrieval layer rather than injecting full financial datasets directly into prompts.
+
+MCP allows agents to retrieve exactly the fields required for each reasoning step:
+- Maya retrieves only what she needs
+- Nash retrieves only what he needs to challenge Maya
+
+Neither agent receives unnecessary data unless the reasoning chain requires it.
+
+This:
+- Keeps prompts focused
+- Reduces irrelevant context noise
+- Improves freshness of retrieved financial data
+- Reduces token usage and latency
+
+### Rejected Alternative
+**Full financial data ingestion at session start**
+
+**Reason for rejection:**  
+Injecting complete financial datasets into every prompt increases latency and token cost while also risking stale reasoning over outdated data.
+
+### Rejected Alternative
+**Static data snapshots per conversation turn**
+
+**Reason for rejection:**  
+Snapshots reduce repeated fetching but introduce staleness risk in real-time financial environments where balances and market conditions change frequently.
+
+---
+
+## 3. Session persistence strategy
+
+### Decision
+Use Firebase for session persistence with in-memory state during active conversations.
+
+Firebase provides reliable asynchronous persistence for completed sessions while active sessions remain memory-resident for lower latency.
+
+### What I would improve in production
+
+Writing to Firebase on every message introduces latency at scale.
+
+In production, I would:
+- Use Redis for active conversation state
+- Persist asynchronously to Firebase only:
+  - on session close
+  - or at checkpoint intervals
+
+This would significantly reduce per-message latency under high traffic.
+
+---
+
+## 4. Frontend communication model
+
+### Decision
+Use a React + Vite frontend communicating with a Node.js backend via REST APIs, with the backend acting as the gateway to the ADK agent service.
+
+The frontend never communicates directly with agents.
+
+All agent interactions are mediated through the backend which handles:
+- Session management
+- Authentication context
+- Validation
+- Error handling
+
+### Why this matters
+
+Direct frontend-to-agent communication would expose the agent service to unauthenticated requests.
+
+The backend gateway ensures only validated and authenticated sessions can trigger agent reasoning.
+
+---
+
+# What I Would Build Next
+
+1. **Streaming agent responses**  
+   Stream partial outputs for improved perceived latency during longer reasoning chains.
+
+2. **Structured disagreement logging**  
+   Surface disagreements between Maya and Nash to improve transparency and user trust.
+
+3. **Redis session store**  
+   Replace Firebase for active session state to reduce latency at production scale.
+
+4. **Evaluation harness**  
+   Systematically benchmark whether the dual-agent architecture outperforms single-agent systems across financial reasoning scenarios.
+
+---
+
+# Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | React + Vite |
+| Backend | Node.js + Express |
+| Agent Framework | Google ADK |
+| Persistence | Firebase |
+| AI Infrastructure | Vertex AI |
+| Financial Data Layer | FI Money MCP |
+
+---
+
+# Prerequisites
+
+- Node.js (v16 or higher)
+- Python (v3.8 or higher)
+- Google Cloud Project with Vertex AI enabled
+- Firebase Project
+- FI Money MCP access
+
+---
+
+# Quick Start
+
+## 1. Agent Service Setup
 
 ```bash
 cd agent
-```
-
-Create environment file:
-```bash
 cp env.example .env
 ```
 
-Configure the `.env` file with your Google Cloud settings:
+Configure `.env`:
+
 ```env
-# Google ADK Configuration
 GOOGLE_GENAI_USE_VERTEXAI=TRUE
 GOOGLE_CLOUD_PROJECT=your-google-cloud-project-id
 GOOGLE_CLOUD_LOCATION=us-central1
-
-# Financial News API Configuration
 FINANCIAL_NEWS_API_KEY=your_eventregistry_api_key
 ```
 
-Install dependencies and start the agent:
+Install dependencies and start the agent service:
+
 ```bash
 pip install -r requirements.txt
 adk web start
 ```
 
-**Verify Agent Service**: Check that the agent is running at `http://localhost:8000`
+Verify:
+```text
+http://localhost:8000
+```
 
-### 2. Backend Service Setup
+---
 
-Navigate to the backend directory:
+## 2. Backend Service Setup
 
 ```bash
 cd backend
-```
-
-Create environment file:
-```bash
 cp env.example .env
 ```
 
-Configure the `.env` file:
-```env
-# Server Configuration
-PORT=3000
+Configure `.env`:
 
-# ADK Agents Configuration
+```env
+PORT=3000
 ADK_AGENTS_URL=http://localhost:8000
 ADK_APP_NAME=final_agent
-
-# Firebase Configuration
-FIREBASE_SERVICE_ACCOUNT_PATH=./config/ignitrix-c80b5-firebase-adminsdk-fbsvc-fec1dd3802.json
-FIREBASE_PROJECT_ID=ignitrix-c80b5
+FIREBASE_SERVICE_ACCOUNT_PATH=./config/your-firebase-adminsdk.json
+FIREBASE_PROJECT_ID=your-firebase-project-id
 ```
 
-Install dependencies and start the backend:
+Install dependencies and start backend:
+
 ```bash
 npm install
 npm start
 ```
 
-**Verify Backend Service**: Check that the backend is running at `http://localhost:3000/api/health`
+Verify:
+```text
+http://localhost:3000/api/health
+```
 
-### 3. Frontend Service Setup
+---
 
-Navigate to the frontend directory:
+## 3. Frontend Service Setup
 
 ```bash
 cd frontend
-```
-
-Create environment file:
-```bash
 cp env.example .env
 ```
 
-Configure the `.env` file:
+Configure `.env`:
+
 ```env
-# Backend API base URL
 VITE_API_BASE_URL=http://localhost:3000/api
 ```
 
-Install dependencies and start the frontend:
+Install dependencies and start frontend:
+
 ```bash
 npm install
 npm run dev
 ```
 
-**Verify Frontend Service**: Check that the frontend is running at `http://localhost:5173`
-
-## Service Verification
-
-After starting each service, verify they are running correctly:
-
-### Agent Service (Port 8000)
-```bash
-curl http://localhost:8000/health
-# Should return agent status
+Verify:
+```text
+http://localhost:5173
 ```
 
-### Backend Service (Port 3000)
-```bash
-curl http://localhost:3000/api/health
-# Should return backend status
-```
+---
 
-### Frontend Service (Port 5173)
-```bash
-# Open browser to http://localhost:5173
-# Should display the chat interface
-```
+# Environment Variables Reference
 
-## Environment Variables Reference
+## Agent Service
 
-### Agent Service
 | Variable | Description | Required |
-|----------|-------------|----------|
-| `GOOGLE_GENAI_USE_VERTEXAI` | Enable Vertex AI | Yes |
-| `GOOGLE_CLOUD_PROJECT` | Google Cloud Project ID | Yes |
-| `GOOGLE_CLOUD_LOCATION` | Google Cloud Location | Yes |
-| `FINANCIAL_NEWS_API_KEY` | EventRegistry API Key | Yes |
+|---|---|---|
+| GOOGLE_GENAI_USE_VERTEXAI | Enable Vertex AI | Yes |
+| GOOGLE_CLOUD_PROJECT | Google Cloud Project ID | Yes |
+| GOOGLE_CLOUD_LOCATION | Google Cloud Location | Yes |
+| FINANCIAL_NEWS_API_KEY | EventRegistry API Key | Yes |
 
-### Backend Service
+---
+
+## Backend Service
+
 | Variable | Description | Required |
-|----------|-------------|----------|
-| `PORT` | Server port | No (default: 3000) |
-| `ADK_AGENTS_URL` | Agent service URL | Yes |
-| `ADK_APP_NAME` | ADK application name | Yes |
-| `FIREBASE_PROJECT_ID` | Firebase project ID | Yes |
-| `FIREBASE_SERVICE_ACCOUNT_PATH` | Firebase service account path | Yes |
+|---|---|---|
+| PORT | Server Port | No |
+| ADK_AGENTS_URL | Agent Service URL | Yes |
+| ADK_APP_NAME | ADK Application Name | Yes |
+| FIREBASE_PROJECT_ID | Firebase Project ID | Yes |
+| FIREBASE_SERVICE_ACCOUNT_PATH | Firebase Service Account Path | Yes |
 
-### Frontend Service
+---
+
+## Frontend Service
+
 | Variable | Description | Required |
-|----------|-------------|----------|
-| `VITE_API_BASE_URL` | Backend API URL | Yes |
+|---|---|---|
+| VITE_API_BASE_URL | Backend API URL | Yes |
 
-## AI Agents
+---
 
-The system features three specialized AI agents:
+# Troubleshooting
 
-### Maya - Health Diagnostic Agent
-- **Role**: Financial data analysis and health assessment
-- **Capabilities**: Discovers insights from financial data
-- **Tools**: FI Money MCP integration
+### Agent service not starting
+Verify:
+- Google Cloud credentials
+- Vertex AI is enabled
 
-### Nash - Strategy Planning Agent
-- **Role**: Scenario modeling and strategy development
-- **Capabilities**: Finds optimal strategies and models scenarios
-- **Tools**: FI Money MCP integration
+---
 
-### Collaboration Engine
-- **Role**: Orchestrates agent interactions
-- **Capabilities**: Coordinates between Maya and Nash for comprehensive analysis
-- **Output**: Final summary and recommendations
+### Backend connection issues
+Verify:
+- Agent service is running on port 8000
+- `ADK_AGENTS_URL` is configured correctly
 
-## Development Workflow
+---
 
-1. **Start Agent First**: Ensure ADK web service is running on port 8000
-2. **Start Backend**: Verify backend connects to agent service
-3. **Start Frontend**: Confirm frontend can communicate with backend
-4. **Test Integration**: Send a message through the chat interface
+### Frontend connection issues
+Verify:
+- Backend is running on port 3000
+- `VITE_API_BASE_URL` is configured correctly
 
-## Troubleshooting
+---
 
-### Common Issues
+### Port conflicts
+Update the relevant `.env` files if ports are already in use.
 
-1. **Agent Service Not Starting**
-   - Verify Google Cloud credentials
-   - Check Vertex AI is enabled
-   - Ensure all environment variables are set
+---
 
-2. **Backend Connection Issues**
-   - Verify agent service is running on port 8000
-   - Check `ADK_AGENTS_URL` in backend `.env`
-   - Confirm Firebase configuration
+# Built At
 
-3. **Frontend Connection Issues**
-   - Verify backend is running on port 3000
-   - Check `VITE_API_BASE_URL` in frontend `.env`
-   - Ensure CORS is configured on backend
+Google Cloud Agentic AI Hackathon
+Team Ignitirix - Navina Amuthan & Harihara Roopan
+Grand Finalist — Top 250 of 50,000+ participants worldwide
 
-### Port Conflicts
+---
 
-If ports are already in use:
-- **Port 8000**: Change agent service port in ADK configuration
-- **Port 3000**: Update `PORT` in backend `.env`
-- **Port 5173**: Vite will automatically find an available port
-
-This project is part of the Ignitrix Agentic AI system. 
